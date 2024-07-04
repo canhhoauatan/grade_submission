@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>Image Upload and Processing</title>
+    <style>
+        body {
+            transition: background-color 0.3s, color 0.3s;
+            background-color: rgb(235, 228, 225);
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+        }
+        .dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 50px 35px;
+            text-align: center;
+            color: #aaa;
+            margin-bottom: 20px;
+            cursor: pointer;
+            display: inline-block;
+            width: calc(50% - 80px);
+            background-color: rgba(255, 255, 225, 0.3);
+            font-weight: bold;
+            transition: background-color 0.3s, color 0.3s;
+            position: sticky;
+            top: 1px;
+        }
+        .drop-zone.dragover {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .image-block {
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: center;
+            width: calc(33% - 30px);
+            background-color: rgb(245,255,250);
+        }
+        .image-block img {
+            border-radius: 10px;
+            width: 100%;
+            height: auto;
+        }
+        .hidden {
+            display: none;
+        }
+        .full-width {
+            width: 95%;
+        }
+        .result-details {
+            margin-top: 20px;
+        }
+        .dark-mode .drop-zone {
+            border-color: #555;
+            background-color: rgba(255, 228, 225, 0.1);
+        }
+        .dark-mode .image-block {
+            border-color: #555;
+            background-color: rgb(25, 30, 40);
+        }
+        .toggle-dark-mode {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(235, 225, 0, 0.3);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s, transform 0.3s;
+        }
+        .toggle-dark-mode:hover {
+            background-color: #ffd633;
+            transform: scale(1.1);
+        }
+        .toggle-dark-mode:focus {
+            outline: none;
+        }
+        .dark-mode .toggle-dark-mode {
+            background-color: #333;
+            color: #fff;
+        }
+        .toggle-dark-mode .icon {
+            font-size: 24px;
+        }
+        @media (max-width: 1200px) {
+            .drop-zone {
+                width: calc(100% - 40px);
+            }
+
+            .image-block {
+                flex: 1 1 calc(50% - 80px);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .drop-zone {
+                width: calc(100% - 40px);
+            }
+
+            .image-block {
+                flex: 1 1 calc(100% - 20px);
+            }
+        }
+        .info-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            color: black;
+            z-index: 1000; /* ensure it stays on top */
+        }
+        .info-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            width: 80%;
+            max-width: 600px;
+        }
+        .dark-mode .info-content {
+            background-color: #333;
+            color: #e0e0e0;
+        }
+        .info-content h2 {
+            margin-top: 0;
+        }
+  /*      .close-info {
+            cursor: pointer;
+            font-size: 20px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }*/
+
+        /* Add these styles for the chart */
+        .chart-container {
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div id="dropZone" class="drop-zone">
+        Drag and drop answer here
+    </div>
+    <div id="dropZone2" class="drop-zone">
+        Drag and drop images here
+    </div>
+    <div id="result" class="image-container">
+        <!-- Image blocks will be appended here -->
+    </div>
+
+    <button class="toggle-dark-mode" id="darkModeToggle">
+        <i class="fas fa-sun icon"></i>
+    </button>
+
+        <!-- Add this button for showing information -->
+    <button id="infoButton" class="toggle-dark-mode" style="bottom: 80px;">
+        <i class="fas fa-info-circle icon"></i>
+    </button>
+
+    <!-- Add this modal for displaying information -->
+    <div id="infoModal" class="info-modal">
+        <div class="info-content">
+            <!-- <span class="close-info" id="closeInfo">&times;</span> -->
+            <h2>Information</h2>
+            <p id="infoDetails"></p>
+            <div class="chart-container">
+                <canvas id="scoreChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const dropZone2 = document.getElementById('dropZone2');
+        const resultContainer = document.getElementById('result');
+        const darkModeToggle = document.getElementById('darkModeToggle');
+
+        let answerData = null;
+        let scores = [];
+        let totalSubmissions = 0;
+
+        document.getElementById('infoButton').addEventListener('click', () => {
+            document.getElementById('infoModal').style.display = 'flex';
+            updateInfoModal();
+        });
+
+        document.getElementById('infoModal').addEventListener('click', (event) => {
+            if (event.target === document.getElementById('infoModal')) {
+                document.getElementById('infoModal').style.display = 'none';
+            }
+        });
+
+        function setDarkMode(isDark) {
+            if (isDark) {
+                document.body.classList.add('dark-mode');
+                darkModeToggle.querySelector('.icon').classList.remove('fa-sun');
+                darkModeToggle.querySelector('.icon').classList.add('fa-moon');
+            } else {
+                document.body.classList.remove('dark-mode');
+                darkModeToggle.querySelector('.icon').classList.remove('fa-moon');
+                darkModeToggle.querySelector('.icon').classList.add('fa-sun');
+            }
+            localStorage.setItem('darkMode', isDark);
+        }
+
+        darkModeToggle.addEventListener('click', () => {
+            const isDark = document.body.classList.toggle('dark-mode');
+            setDarkMode(isDark);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            setDarkMode(isDark);
+        });
+
+        dropZone.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = event.dataTransfer.files;
+            handleFiles(files, true);
+            hideDropZone();
+        });        
+
+        dropZone2.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropZone2.classList.add('dragover');
+        });
+
+        dropZone2.addEventListener('dragleave', () => {
+            dropZone2.classList.remove('dragover');
+        });
+
+        dropZone2.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropZone2.classList.remove('dragover');
+            const files = event.dataTransfer.files;
+            handleFiles(files, false);
+        });
+
+        dropZone.addEventListener('click', () => {
+            openFileDialog(true);
+        });
+
+        dropZone2.addEventListener('click', () => {
+            openFileDialog(false);
+        });
+
+        function handleFiles(files, isAnswer) {
+            for (let i = 0; i < files.length; i++) {
+                processFile(files[i], isAnswer);
+            }
+        }
+
+        function processFile(file, isAnswer) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    if (isAnswer) {
+                        answerData = data;
+                    } else {
+                        addImageBlock(data);
+                        if (answerData) {
+                            gradeSubmission(data);
+                        }
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function openFileDialog(isAnswer) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = true;
+
+            input.addEventListener('change', (event) => {
+                const files = event.target.files;
+                handleFiles(files, isAnswer);
+                if (isAnswer) {
+                    hideDropZone();
+                }
+            });
+
+            input.click();
+        }
+
+        function addImageBlock(data) {
+            const imageBlock = document.createElement('div');
+            imageBlock.classList.add('image-block');
+
+            const image = document.createElement('img');
+            const randomParam = new Date().getTime(); // Tạo tham số ngẫu nhiên dựa trên thời gian hiện tại
+            image.src = '/processed/' + data.processed_image_path.split('/').pop() + '?t=' + randomParam;
+            
+            const part1 = document.createElement('p');
+            part1.textContent = data.Part_1;
+            
+            const part2 = document.createElement('p');
+            part2.textContent = data.Part_2;
+            
+            const part3 = document.createElement('p');
+            part3.textContent = data.Part_3;
+
+            imageBlock.appendChild(image);
+            imageBlock.appendChild(part1);
+            imageBlock.appendChild(part2);
+            imageBlock.appendChild(part3);
+
+            // Add result details container
+            const resultDetails = document.createElement('div');
+            resultDetails.classList.add('result-details');
+
+            imageBlock.appendChild(resultDetails);
+            resultContainer.appendChild(imageBlock);
+        }
+
+        function hideDropZone() {
+            dropZone.classList.add('hidden');
+            dropZone2.classList.add('full-width');
+        }
+
+        function gradeSubmission(submissionData) {
+            let totalScore = 0;
+            let part1Score = 0;
+            let part2Score = 0;
+            let part3Score = 0;
+
+            const part1Answer = answerData.Part_1;
+            const part1Submission = submissionData.Part_1;
+            let part1Wrong = [];
+            for (let i = 0; i < 12; i++) {
+                if (part1Answer[i] === part1Submission[i]) {
+                    part1Score += 0.25;
+                } else {
+                    part1Wrong.push({ index: i + 1, answer: part1Answer[i], submission: part1Submission[i] });
+                }
+            }
+
+            const part2Answer = answerData.Part_2.split('');
+            const part2Submission = submissionData.Part_2.split('');
+            let part2Wrong = [];
+            for (let i = 0; i < 4; i++) {
+                let correctCount = 0;
+                let wrongIndices = [];
+                for (let j = 0; j < 4; j++) {
+                    const answerIndex = i * 4 + j;
+                    if (part2Answer[answerIndex] === part2Submission[answerIndex]) {
+                        correctCount++;
+                    } else {
+                        wrongIndices.push(answerIndex + 1);
+                    }
+                }
+                switch (correctCount) {
+                    case 1:
+                        part2Score += 0.1;
+                        wrongIndices.forEach(idx => part2Wrong.push({ index: idx, answer: part2Answer[idx - 1], submission: part2Submission[idx - 1] }));
+                        break;
+                    case 2:
+                        part2Score += 0.25;
+                        wrongIndices.forEach(idx => part2Wrong.push({ index: idx, answer: part2Answer[idx - 1], submission: part2Submission[idx - 1] }));
+                        break;
+                    case 3:
+                        part2Score += 0.5;
+                        wrongIndices.forEach(idx => part2Wrong.push({ index: idx, answer: part2Answer[idx - 1], submission: part2Submission[idx - 1] }));
+                        break;
+                    case 4:
+                        part2Score += 1;
+                        break;
+                }
+            }
+
+            const part3Answer = answerData.Part_3.match(/.{1,4}/g);
+            const part3Submission = submissionData.Part_3.match(/.{1,4}/g);
+            let part3Wrong = [];
+            for (let i = 0; i < part3Answer.length; i++) {
+                if (part3Answer[i] === part3Submission[i]) {
+                    part3Score += 0.5;
+                } else {
+                    part3Wrong.push({ index: i + 1, answer: part3Answer[i], submission: part3Submission[i] });
+                }
+            }
+
+            totalScore = part1Score + part2Score + part3Score;
+
+            const resultContent = `
+                <h2>Grading Details</h2>
+                <p><strong>TOTAL SCORE:</strong> ${totalScore.toFixed(2)} / 10.00</p>
+                <p><strong>Part 1 Score:</strong> ${part1Score.toFixed(2)} / 3.00</p>
+                <p><strong>Part 1 Wrong:</strong> ${formatWrongAnswers(part1Wrong)}</p>
+                <p><strong>Part 2 Score:</strong> ${part2Score.toFixed(2)} / 4.00</p>
+                <p><strong>Part 2 Wrong:</strong> ${formatWrongAnswers(part2Wrong)}</p>
+                <p><strong>Part 3 Score:</strong> ${part3Score.toFixed(2)} / 3.00</p>
+                <p><strong>Part 3 Wrong:</strong> ${formatWrongAnswers(part3Wrong)}</p>
+            `;
+
+            const lastImageBlock = resultContainer.lastChild;
+            const lastResultDetails = lastImageBlock.querySelector('.result-details');
+            lastResultDetails.innerHTML = resultContent;
+            scores.push(totalScore);
+            totalSubmissions++;
+
+            // Update statistics information
+            updateInfoModal();
+        }
+
+        function formatWrongAnswers(wrongList) {
+            return wrongList.map(item => `
+                ${item.index}: (
+                    <span style="color: green;">${item.answer}</span> 
+                    <span style="color: red;">${item.submission}</span>
+                )
+            `).join(', ') || 'None';
+        }
+
+        function updateInfoModal() {
+            const maxScore = Math.max(...scores).toFixed(2);
+            const minScore = Math.min(...scores).toFixed(2);
+            const avgScore = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2);
+
+            const infoDetails = `
+                <p><strong>Highest Score:</strong> ${maxScore} / 10.00</p>
+                <p><strong>Lowest Score:</strong> ${minScore} / 10.00</p>
+                <p><strong>Average Score:</strong> ${avgScore} / 10.00</p>
+                <p><strong>Total Submissions:</strong> ${totalSubmissions}</p>
+                <p><strong>Most Incorrect Questions:</strong> Coming soon...</p>
+            `;
+
+            document.getElementById('infoDetails').innerHTML = infoDetails;
+
+            updateChart();
+        }
+
+        function updateChart() {
+            const ctx = document.getElementById('scoreChart').getContext('2d');
+            const scoreChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: scores.map((_, index) => `Submission ${index + 1}`),
+                    datasets: [{
+                        label: 'Scores',
+                        data: scores,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 10
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
